@@ -1,0 +1,20 @@
+{
+  "timestamp": "2025-07-21T09:22:17.109733",
+  "detections": [
+    {
+      "class": "person",
+      "confidence": 0.9034966826438904,
+      "bbox": [
+        1629,
+        188,
+        1884,
+        823
+      ],
+      "area": 161878.992882343
+    }
+  ],
+  "has_person": true,
+  "has_dog": false,
+  "has_bird": false,
+  "bird_species": null
+}

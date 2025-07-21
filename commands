@@ -1,0 +1,23 @@
+>> to run:
+python3 main_monitor_with_stats.py
+
+>> check stats:
+python3 view_stats.py
+
+>> check stats analyse:
+python3 view_stats.py analyse
+
+>> check stats summary
+python3 view_stats.py summary
+
+>> check ip
+hostnam -I
+
+>> connect 
+ssh pi@ip
+
+>> check using camera
+sudo lsof /dev/video*
+
+force kill
+sudo kill -9 <PID>

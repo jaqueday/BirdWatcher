@@ -1,0 +1,23 @@
+{
+  "motion_sensitivity": 25,
+  "motion_min_area": 5000,
+  "motion_cooldown": 2,
+  "ai_confidence_threshold": 0.3,
+  "save_all_detections": true,
+  "save_only_targets": false,
+  "log_level": "INFO",
+  "show_live_stats": true,
+  "stats_interval": 60,
+  
+  "_comments": {
+    "motion_sensitivity": "Lower values = more sensitive motion detection (1-100)",
+    "motion_min_area": "Minimum pixel area to trigger motion detection",
+    "motion_cooldown": "Seconds between motion detections to avoid spam",
+    "ai_confidence_threshold": "Minimum confidence for AI detections (0.0-1.0)",
+    "save_all_detections": "Save all motion events, even without target objects",
+    "save_only_targets": "Only save when person/dog/bird detected",
+    "log_level": "Logging level: DEBUG, INFO, WARNING, ERROR",
+    "show_live_stats": "Show live statistics after each detection",
+    "stats_interval": "Show periodic stats every N seconds (0 = disabled)"
+  }
+}
