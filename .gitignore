@@ -1,0 +1,6 @@
+# Ignore image folders
+/captures
+/detections
+/logs
+/test_images
+/test_results
