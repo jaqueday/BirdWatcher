@@ -6,7 +6,7 @@
   "save_all_detections": true,
   "save_only_targets": false,
   "log_level": "INFO",
-  "show_live_stats": true,
+  "show_live_stats": false,
   "stats_interval": 60,
   
   "_comments": {

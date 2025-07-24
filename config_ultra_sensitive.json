@@ -1,0 +1,10 @@
+{
+  "motion_sensitivity": 1,
+  "motion_min_area": 100,
+  "motion_cooldown": 0.5,
+  "ai_confidence_threshold": 0.1,
+  "save_all_detections": true,
+  "verbose_motion": true,
+  "quiet_mode": false,
+  "log_level": "DEBUG"
+}
