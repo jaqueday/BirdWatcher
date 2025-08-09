@@ -231,7 +231,11 @@ class DetectionStats:
         # Recent activity
         print("\n🕐 RECENT ACTIVITY (Last 12 hours):")
         hourly = self.get_hourly_breakdown(12)
-        for hour, counts in sorted(hourly.items(), reverse=True)[:6]:
+        # get_hourly_breakdown returns hours in reverse chronological order
+        # (current hour first).  Sorting them alphabetically breaks this
+        # ordering around midnight because "23:00" would come before
+        # "02:00".  Iterate over the existing order instead.
+        for hour, counts in list(hourly.items())[:6]:
             total = sum(counts.values())
             if total > 0:
                 print(f"   {hour}: {counts['person']}P, {counts['dog']}D, {counts['bird']}B")
