@@ -1,0 +1,13 @@
+{
+  "image_size": [
+    224,
+    224
+  ],
+  "class_names": [
+    "felix",
+    "leia"
+  ],
+  "tensorflow_version": "2.20.0-rc0",
+  "model_type": "MobileNetV2-based",
+  "preprocessing": "rescale to [0,1]"
+}

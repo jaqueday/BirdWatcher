@@ -20,7 +20,7 @@
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         
@@ -70,7 +70,7 @@
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
             text-align: center;
         }
@@ -93,13 +93,40 @@
             margin-top: 5px;
         }
         
-        .recent-activity {
+        .dog-stats {
             grid-column: 1 / -1;
+        }
+        
+        .dog-stats .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        .felix-stat { background: #fef3ff; }
+        .leia-stat { background: #f0f9ff; }
+        
+        .felix-stat .stat-number { color: #a855f7; }
+        .leia-stat .stat-number { color: #0ea5e9; }
+        
+        .images-section {
+            grid-column: 1 / -1;
+        }
+        
+        .images-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .image-group h3 {
+            color: #4f46e5;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-align: center;
         }
         
         .captures-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 15px;
         }
         
@@ -108,12 +135,18 @@
             border-radius: 8px;
             overflow: hidden;
             text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .capture-item:hover {
+            transform: scale(1.02);
         }
         
         .capture-item img {
             width: 100%;
-            height: 150px;
+            height: 140px;
             object-fit: cover;
+            cursor: pointer;
         }
         
         .capture-info {
@@ -142,7 +175,24 @@
         
         .badge-person { background: #10b981; }
         .badge-dog { background: #f59e0b; }
+        .badge-felix { background: #a855f7; }
+        .badge-leia { background: #0ea5e9; }
         .badge-bird { background: #ef4444; }
+        
+        .detection-summary {
+            font-size: 0.8em;
+            color: #374151;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        .motion-indicator {
+            background: #6b7280;
+            color: white;
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
         
         .refresh-info {
             text-align: center;
@@ -151,13 +201,24 @@
             opacity: 0.8;
         }
         
+        @media (max-width: 1024px) {
+            .images-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
         @media (max-width: 768px) {
             .grid {
                 grid-template-columns: 1fr;
             }
             
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .dog-stats .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
             
             .header h1 {
@@ -195,16 +256,20 @@
                 </div>
             </div>
             
-            <div class="card">
-                <h2>📈 System Metrics</h2>
+            <div class="card dog-stats">
+                <h2>🐕 Dog Detections</h2>
                 <div class="stats-grid">
+                    <div class="stat-item felix-stat">
+                        <div class="stat-number">{{ felix_count }}</div>
+                        <div class="stat-label">🐕 Felix</div>
+                    </div>
+                    <div class="stat-item leia-stat">
+                        <div class="stat-number">{{ leia_count }}</div>
+                        <div class="stat-label">🐕 Leia</div>
+                    </div>
                     <div class="stat-item">
                         <div class="stat-number">{{ summary.motion_events }}</div>
                         <div class="stat-label">Motion Events</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">{{ total_detections }}</div>
-                        <div class="stat-label">Total Detections</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-number">{{ detection_rate }}%</div>
@@ -225,47 +290,79 @@
             </div>
             {% endif %}
             
-            <div class="card recent-activity">
-                <h2>📷 Recent Captures</h2>
-                {% if recent_captures %}
-                <div class="captures-grid">
-                    {% for capture in recent_captures %}
-                    <div class="capture-item">
-                        <img src="/captures/{{ capture.filename }}" alt="Capture" onclick="window.open(this.src, '_blank')">
-                        <div class="capture-info">
-                            <div class="capture-time">{{ capture.time_ago }}</div>
-                            {% if capture.detection_info %}
-                            <div class="detection-badges">
-                                {% if capture.detection_info.has_person %}
-                                <span class="detection-badge badge-person">Person</span>
-                                {% endif %}
-                                {% if capture.detection_info.has_dog %}
-                                <span class="detection-badge badge-dog">Dog</span>
-                                {% endif %}
-                                {% if capture.detection_info.has_bird %}
-                                <span class="detection-badge badge-bird">
-                                    {% if capture.detection_info.bird_species %}
-                                        {{ capture.detection_info.bird_species }}
-                                    {% else %}
-                                        Bird
-                                    {% endif %}
-                                </span>
-                                {% endif %}
+            <div class="card images-section">
+                <h2>📷 Recent Activity</h2>
+                <div class="images-container">
+                    <div class="image-group">
+                        <h3>🎬 Latest Motion Captures</h3>
+                        {% if recent_motion_captures %}
+                        <div class="captures-grid">
+                            {% for capture in recent_motion_captures %}
+                            <div class="capture-item">
+                                <img src="/captures/{{ capture.filename }}" alt="Motion Capture" onclick="window.open(this.src, '_blank')">
+                                <div class="capture-info">
+                                    <div class="capture-time">{{ capture.time_ago }}</div>
+                                    <div class="motion-indicator">Motion Event</div>
+                                </div>
                             </div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <p style="text-align: center; color: #6b7280;">No recent motion captures</p>
+                        {% endif %}
                     </div>
-                    {% endfor %}
+                    
+                    <div class="image-group">
+                        <h3>🎯 Latest AI Detections</h3>
+                        {% if recent_ai_detections %}
+                        <div class="captures-grid">
+                            {% for detection in recent_ai_detections %}
+                            <div class="capture-item">
+                                <img src="/detections/{{ detection.filename }}" alt="AI Detection" onclick="window.open(this.src, '_blank')">
+                                <div class="capture-info">
+                                    <div class="capture-time">{{ detection.time_ago }}</div>
+                                    {% if detection.detection_info %}
+                                    <div class="detection-badges">
+                                        {% if detection.detection_info.has_person %}
+                                        <span class="detection-badge badge-person">Person</span>
+                                        {% endif %}
+                                        {% if detection.detection_info.has_felix %}
+                                        <span class="detection-badge badge-felix">Felix</span>
+                                        {% elif detection.detection_info.has_leia %}
+                                        <span class="detection-badge badge-leia">Leia</span>
+                                        {% elif detection.detection_info.has_dog %}
+                                        <span class="detection-badge badge-dog">Dog</span>
+                                        {% endif %}
+                                        {% if detection.detection_info.has_bird %}
+                                        <span class="detection-badge badge-bird">
+                                            {% if detection.detection_info.bird_species %}
+                                                {{ detection.detection_info.bird_species }}
+                                            {% else %}
+                                                Bird
+                                            {% endif %}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="detection-summary">{{ detection.detection_info.summary }}</div>
+                                    {% else %}
+                                    <div class="detection-summary">Processing...</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p style="text-align: center; color: #6b7280;">No recent AI detections</p>
+                        {% endif %}
+                    </div>
                 </div>
-                {% else %}
-                <p>No recent captures found</p>
-                {% endif %}
             </div>
         </div>
         
         <div class="refresh-info">
             <p>📱 Dashboard automatically refreshes every 30 seconds</p>
             <p>💡 Click on images to view full size</p>
+            <p>🎯 AI detections show bounding boxes around detected objects</p>
         </div>
     </div>
     

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Bird Watcher Web Dashboard
-Simple Flask web server showing detection statistics and recent captures
+Enhanced version with separate motion/AI detection views and Felix/Leia tracking
 """
 
 from flask import Flask, render_template, jsonify, send_from_directory
@@ -32,25 +32,32 @@ class DashboardData:
         confidence_averages = self.stats.get_confidence_averages()
         hourly_breakdown = self.stats.get_hourly_breakdown(12)
         
-        # Get recent captures
-        recent_captures = self.get_recent_captures(limit=6)
+        # Get recent motion captures and AI detections separately
+        recent_motion_captures = self.get_recent_motion_captures(limit=3)
+        recent_ai_detections = self.get_recent_ai_detections(limit=3)
         
         # Calculate some additional metrics
         total_detections = sum(summary['detections'].values())
         detection_rate = (total_detections / summary['motion_events'] * 100) if summary['motion_events'] > 0 else 0
         
+        # Get specific dog counts
+        felix_count, leia_count = self.get_dog_counts()
+        
         return {
             'summary': summary,
             'confidence_averages': confidence_averages,
             'hourly_breakdown': hourly_breakdown,
-            'recent_captures': recent_captures,
+            'recent_motion_captures': recent_motion_captures,
+            'recent_ai_detections': recent_ai_detections,
             'total_detections': total_detections,
             'detection_rate': round(detection_rate, 1),
-            'system_status': self.get_system_status()
+            'system_status': self.get_system_status(),
+            'felix_count': felix_count,
+            'leia_count': leia_count
         }
     
-    def get_recent_captures(self, limit=6):
-        """Get recent capture files with metadata"""
+    def get_recent_motion_captures(self, limit=3):
+        """Get recent motion capture files (just the motion events)"""
         capture_files = glob.glob(os.path.join(CAPTURES_DIR, "motion_*.jpg"))
         
         if not capture_files:
@@ -65,20 +72,66 @@ class DashboardData:
                 filename = os.path.basename(file_path)
                 mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
                 
-                # Try to find corresponding detection file
-                detection_file = file_path.replace('captures/', 'detections/').replace('.jpg', '.json')
+                recent.append({
+                    'filename': filename,
+                    'timestamp': mod_time.strftime('%Y-%m-%d %H:%M:%S'),
+                    'time_ago': self.time_ago(mod_time),
+                    'type': 'motion'
+                })
+            except:
+                continue
+        
+        return recent
+    
+    def get_recent_ai_detections(self, limit=3):
+        """Get recent AI detection files (with bounding boxes)"""
+        detection_files = glob.glob(os.path.join(DETECTIONS_DIR, "detection_*.jpg"))
+        
+        if not detection_files:
+            return []
+        
+        # Sort by modification time (newest first)
+        detection_files.sort(key=os.path.getmtime, reverse=True)
+        
+        recent = []
+        for file_path in detection_files[:limit]:
+            try:
+                filename = os.path.basename(file_path)
+                mod_time = datetime.fromtimestamp(os.path.getmtime(file_path))
+                
+                # Try to find corresponding JSON file with detection data
+                json_file = file_path.replace('.jpg', '.json')
                 detection_info = None
                 
-                if os.path.exists(detection_file):
+                if os.path.exists(json_file):
                     try:
-                        with open(detection_file, 'r') as f:
+                        with open(json_file, 'r') as f:
                             detection_data = json.load(f)
+                            
+                            # Build detection summary
+                            detected_objects = []
+                            if detection_data.get('has_person', False):
+                                detected_objects.append('Person')
+                            if detection_data.get('has_felix', False):
+                                detected_objects.append('Felix')
+                            elif detection_data.get('has_leia', False):
+                                detected_objects.append('Leia')
+                            elif detection_data.get('has_dog', False):
+                                detected_objects.append('Dog')
+                            if detection_data.get('has_bird', False):
+                                bird_species = detection_data.get('bird_species', 'Bird')
+                                detected_objects.append(bird_species)
+                            
                             detection_info = {
                                 'has_person': detection_data.get('has_person', False),
                                 'has_dog': detection_data.get('has_dog', False),
+                                'has_felix': detection_data.get('has_felix', False),
+                                'has_leia': detection_data.get('has_leia', False),
                                 'has_bird': detection_data.get('has_bird', False),
                                 'bird_species': detection_data.get('bird_species', None),
-                                'detection_count': len(detection_data.get('detections', []))
+                                'detection_count': len(detection_data.get('detections', [])),
+                                'detected_objects': detected_objects,
+                                'summary': ', '.join(detected_objects) if detected_objects else 'No objects'
                             }
                     except:
                         pass
@@ -87,12 +140,36 @@ class DashboardData:
                     'filename': filename,
                     'timestamp': mod_time.strftime('%Y-%m-%d %H:%M:%S'),
                     'time_ago': self.time_ago(mod_time),
-                    'detection_info': detection_info
+                    'detection_info': detection_info,
+                    'type': 'detection'
                 })
             except:
                 continue
         
         return recent
+    
+    def get_dog_counts(self):
+        """Get specific counts for Felix and Leia"""
+        felix_count = 0
+        leia_count = 0
+        
+        # Check detection JSON files for Felix/Leia counts
+        detection_files = glob.glob(os.path.join(DETECTIONS_DIR, "detection_*.json"))
+        
+        for json_file in detection_files:
+            try:
+                with open(json_file, 'r') as f:
+                    detection_data = json.load(f)
+                    
+                if detection_data.get('has_felix', False):
+                    felix_count += 1
+                if detection_data.get('has_leia', False):
+                    leia_count += 1
+                    
+            except:
+                continue
+        
+        return felix_count, leia_count
     
     def get_system_status(self):
         """Get system status information"""
@@ -189,7 +266,7 @@ def create_html_template():
         }
         
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         
@@ -239,7 +316,7 @@ def create_html_template():
         
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
             text-align: center;
         }
@@ -262,13 +339,40 @@ def create_html_template():
             margin-top: 5px;
         }
         
-        .recent-activity {
+        .dog-stats {
             grid-column: 1 / -1;
+        }
+        
+        .dog-stats .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
+        
+        .felix-stat { background: #fef3ff; }
+        .leia-stat { background: #f0f9ff; }
+        
+        .felix-stat .stat-number { color: #a855f7; }
+        .leia-stat .stat-number { color: #0ea5e9; }
+        
+        .images-section {
+            grid-column: 1 / -1;
+        }
+        
+        .images-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .image-group h3 {
+            color: #4f46e5;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-align: center;
         }
         
         .captures-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 15px;
         }
         
@@ -277,12 +381,18 @@ def create_html_template():
             border-radius: 8px;
             overflow: hidden;
             text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .capture-item:hover {
+            transform: scale(1.02);
         }
         
         .capture-item img {
             width: 100%;
-            height: 150px;
+            height: 140px;
             object-fit: cover;
+            cursor: pointer;
         }
         
         .capture-info {
@@ -311,7 +421,24 @@ def create_html_template():
         
         .badge-person { background: #10b981; }
         .badge-dog { background: #f59e0b; }
+        .badge-felix { background: #a855f7; }
+        .badge-leia { background: #0ea5e9; }
         .badge-bird { background: #ef4444; }
+        
+        .detection-summary {
+            font-size: 0.8em;
+            color: #374151;
+            margin-top: 5px;
+            font-weight: 500;
+        }
+        
+        .motion-indicator {
+            background: #6b7280;
+            color: white;
+            font-size: 0.7em;
+            padding: 2px 6px;
+            border-radius: 10px;
+        }
         
         .refresh-info {
             text-align: center;
@@ -320,13 +447,24 @@ def create_html_template():
             opacity: 0.8;
         }
         
+        @media (max-width: 1024px) {
+            .images-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+        
         @media (max-width: 768px) {
             .grid {
                 grid-template-columns: 1fr;
             }
             
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .dog-stats .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
             }
             
             .header h1 {
@@ -364,16 +502,20 @@ def create_html_template():
                 </div>
             </div>
             
-            <div class="card">
-                <h2>📈 System Metrics</h2>
+            <div class="card dog-stats">
+                <h2>🐕 Dog Detections</h2>
                 <div class="stats-grid">
+                    <div class="stat-item felix-stat">
+                        <div class="stat-number">{{ felix_count }}</div>
+                        <div class="stat-label">🐕 Felix</div>
+                    </div>
+                    <div class="stat-item leia-stat">
+                        <div class="stat-number">{{ leia_count }}</div>
+                        <div class="stat-label">🐕 Leia</div>
+                    </div>
                     <div class="stat-item">
                         <div class="stat-number">{{ summary.motion_events }}</div>
                         <div class="stat-label">Motion Events</div>
-                    </div>
-                    <div class="stat-item">
-                        <div class="stat-number">{{ total_detections }}</div>
-                        <div class="stat-label">Total Detections</div>
                     </div>
                     <div class="stat-item">
                         <div class="stat-number">{{ detection_rate }}%</div>
@@ -394,47 +536,79 @@ def create_html_template():
             </div>
             {% endif %}
             
-            <div class="card recent-activity">
-                <h2>📷 Recent Captures</h2>
-                {% if recent_captures %}
-                <div class="captures-grid">
-                    {% for capture in recent_captures %}
-                    <div class="capture-item">
-                        <img src="/captures/{{ capture.filename }}" alt="Capture" onclick="window.open(this.src, '_blank')">
-                        <div class="capture-info">
-                            <div class="capture-time">{{ capture.time_ago }}</div>
-                            {% if capture.detection_info %}
-                            <div class="detection-badges">
-                                {% if capture.detection_info.has_person %}
-                                <span class="detection-badge badge-person">Person</span>
-                                {% endif %}
-                                {% if capture.detection_info.has_dog %}
-                                <span class="detection-badge badge-dog">Dog</span>
-                                {% endif %}
-                                {% if capture.detection_info.has_bird %}
-                                <span class="detection-badge badge-bird">
-                                    {% if capture.detection_info.bird_species %}
-                                        {{ capture.detection_info.bird_species }}
-                                    {% else %}
-                                        Bird
-                                    {% endif %}
-                                </span>
-                                {% endif %}
+            <div class="card images-section">
+                <h2>📷 Recent Activity</h2>
+                <div class="images-container">
+                    <div class="image-group">
+                        <h3>🎬 Latest Motion Captures</h3>
+                        {% if recent_motion_captures %}
+                        <div class="captures-grid">
+                            {% for capture in recent_motion_captures %}
+                            <div class="capture-item">
+                                <img src="/captures/{{ capture.filename }}" alt="Motion Capture" onclick="window.open(this.src, '_blank')">
+                                <div class="capture-info">
+                                    <div class="capture-time">{{ capture.time_ago }}</div>
+                                    <div class="motion-indicator">Motion Event</div>
+                                </div>
                             </div>
-                            {% endif %}
+                            {% endfor %}
                         </div>
+                        {% else %}
+                        <p style="text-align: center; color: #6b7280;">No recent motion captures</p>
+                        {% endif %}
                     </div>
-                    {% endfor %}
+                    
+                    <div class="image-group">
+                        <h3>🎯 Latest AI Detections</h3>
+                        {% if recent_ai_detections %}
+                        <div class="captures-grid">
+                            {% for detection in recent_ai_detections %}
+                            <div class="capture-item">
+                                <img src="/detections/{{ detection.filename }}" alt="AI Detection" onclick="window.open(this.src, '_blank')">
+                                <div class="capture-info">
+                                    <div class="capture-time">{{ detection.time_ago }}</div>
+                                    {% if detection.detection_info %}
+                                    <div class="detection-badges">
+                                        {% if detection.detection_info.has_person %}
+                                        <span class="detection-badge badge-person">Person</span>
+                                        {% endif %}
+                                        {% if detection.detection_info.has_felix %}
+                                        <span class="detection-badge badge-felix">Felix</span>
+                                        {% elif detection.detection_info.has_leia %}
+                                        <span class="detection-badge badge-leia">Leia</span>
+                                        {% elif detection.detection_info.has_dog %}
+                                        <span class="detection-badge badge-dog">Dog</span>
+                                        {% endif %}
+                                        {% if detection.detection_info.has_bird %}
+                                        <span class="detection-badge badge-bird">
+                                            {% if detection.detection_info.bird_species %}
+                                                {{ detection.detection_info.bird_species }}
+                                            {% else %}
+                                                Bird
+                                            {% endif %}
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="detection-summary">{{ detection.detection_info.summary }}</div>
+                                    {% else %}
+                                    <div class="detection-summary">Processing...</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p style="text-align: center; color: #6b7280;">No recent AI detections</p>
+                        {% endif %}
+                    </div>
                 </div>
-                {% else %}
-                <p>No recent captures found</p>
-                {% endif %}
             </div>
         </div>
         
         <div class="refresh-info">
             <p>📱 Dashboard automatically refreshes every 30 seconds</p>
             <p>💡 Click on images to view full size</p>
+            <p>🎯 AI detections show bounding boxes around detected objects</p>
         </div>
     </div>
     
@@ -479,14 +653,20 @@ def main():
         local_ip = "YOUR_PI_IP"
     
     print("\n" + "="*50)
-    print("🎉 DASHBOARD READY!")
+    print("🎉 ENHANCED DASHBOARD READY!")
     print("="*50)
     print(f"📱 Access from any device on your WiFi:")
     print(f"   • On this Pi: http://localhost:5000")
     print(f"   • From phone/laptop: http://{local_ip}:5000")
     print("")
+    print("🆕 New Features:")
+    print("   • Separate Motion vs AI Detection images")
+    print("   • Felix and Leia specific counters")
+    print("   • Enhanced visual design")
+    print("   • Mobile-responsive layout")
+    print("")
     print("🔄 Dashboard will auto-refresh every 30 seconds")
-    print("📷 Click on capture images to view full size")
+    print("📷 Click on images to view full size")
     print("⏹️  Press Ctrl+C to stop the dashboard")
     print("="*50)
     
